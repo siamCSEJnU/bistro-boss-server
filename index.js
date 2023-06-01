@@ -10,20 +10,20 @@ app.use(cors());
 app.use(express.json());
 
 const verifyJWT = (req, res, next) => {
-  const authorzation = req.headers.authorzation;
-  if (!authorzation) {
+  const authorization = req.headers.authorization;
+  if (!authorization) {
     return res
       .status(401)
       .send({ error: true, message: "unauthorized access" });
   }
-  const token = authorzation.split(" ")[1];
+  const token = authorization.split(" ")[1];
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
     if (error) {
       return res
         .status(401)
         .send({ error: true, message: "unauthorized access" });
     }
-    req.decoded = decoded;
+    req.decoded = decoded; //decoded/payload {email : ...}
     next();
   });
 };
@@ -53,13 +53,27 @@ async function run() {
     app.post("/jwt", (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: "1hr",
+        expiresIn: "1h",
       });
       res.send({ token });
     });
 
+    //warning use verifyJWT before using verifyAdmin
+
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.eamil;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      if (user?.role !== "admin") {
+        return res
+          .status(403)
+          .send({ error: true, message: "forbidden access" });
+      }
+      next();
+    };
+
     //user related apis
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyJWT, verifyAdmin, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
@@ -74,6 +88,18 @@ async function run() {
       }
 
       const result = await usersCollection.insertOne(user);
+      res.send(result);
+    });
+
+    //verify wether admin or not
+    app.get("/users/admin/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      if (req.decoded.email !== email) {
+        res.send({ admin: false });
+      }
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const result = { admin: user?.role === "admin" };
       res.send(result);
     });
 
