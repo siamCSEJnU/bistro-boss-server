@@ -59,9 +59,8 @@ async function run() {
     });
 
     //warning use verifyJWT before using verifyAdmin
-
     const verifyAdmin = async (req, res, next) => {
-      const email = req.decoded.eamil;
+      const email = req.decoded.email;
       const query = { email: email };
       const user = await usersCollection.findOne(query);
       if (user?.role !== "admin") {
@@ -120,6 +119,12 @@ async function run() {
     app.get("/menu", async (req, res) => {
       const result = await menuCollection.find().toArray();
       //   console.log("hit");
+      res.send(result);
+    });
+
+    app.post("/menu", verifyJWT, verifyAdmin, async (req, res) => {
+      const newItem = req.body;
+      const result = await menuCollection.insertOne(newItem);
       res.send(result);
     });
 
